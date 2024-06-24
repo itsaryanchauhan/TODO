@@ -1,17 +1,15 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const jwt = require('jsonwebtoken');
-const { OPAClient } = require('@open-policy-agent/opa-client');
+const fetch = require('node-fetch');
 
 const app = express();
 const port = 3000;
 
 app.use(bodyParser.json());
+app.use(express.static('public'));
 
 const JWT_SECRET = 'your-secret-key';  // In production, use a secure secret
-const opaClient = new OPAClient({
-    url: 'http://localhost:8181'  // OPA server URL
-});
 
 const users = [
     { id: 1, username: 'admin', password: 'admin', role: 'admin' },
@@ -34,9 +32,19 @@ function authenticateToken(req, res, next) {
 }
 
 async function checkPolicy(user, action, resource) {
-    const input = { user, action, resource };
-    const result = await opaClient.postQuery('todoapp/allow', { input });
-    return result.result;
+    const input = { input: { user, action, resource } };
+    try {
+        const response = await fetch('http://localhost:8181/v1/data/todoapp/allow', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(input)
+        });
+        const result = await response.json();
+        return result.result;
+    } catch (error) {
+        console.error('Error checking policy:', error);
+        return false;
+    }
 }
 
 app.post('/api/login', (req, res) => {
